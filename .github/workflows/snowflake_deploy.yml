@@ -18,6 +18,9 @@ jobs:
         uses: snowflakedb/snowflake-cli-action@v2.0
         with:
           cli-version: "3.1.0"
+      - name: Fix OpenSSL Compatibility
+        # This forces the internal environment to use a compatible version
+        run: pip install --upgrade "pyOpenSSL>=22.1.0"
 
       - name: Run Deploy Script
         env:
