@@ -14,18 +14,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Snowflake CLI
-        uses: snowflakedb/snowflake-cli-action@v2.0
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          cli-version: "3.1.0"
-      - name: Fix OpenSSL Compatibility
-        # This forces the internal environment to use a compatible version
-        run: pip install --upgrade "pyOpenSSL>=22.1.0"
+          python-version: '3.11'
+
+      - name: Install Snowflake CLI and Fix Compatibility
+        run: |
+          # This installs the CLI and the fix together in the same environment
+          pip install snowflake-cli-labs==3.1.0 "pyOpenSSL>=22.1.0"
 
       - name: Run Deploy Script
         env:
-          # This maps your GitHub Secret to the Snowflake CLI
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: github_service_user
           SNOWFLAKE_AUTHENTICATOR: SNOWFLAKE_JWT
-        run: snow sql -f scripts/create_table.sql
+        run: snow sql -f scripts/create_table.sql -x
+        
