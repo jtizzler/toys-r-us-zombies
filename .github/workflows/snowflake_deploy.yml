@@ -42,4 +42,4 @@ jobs:
           snow sql -q "SELECT CURRENT_VERSION()" -x
 
           # Deploy your actual table
-          snow sql --file scripts/create_table.sql -x
+          snow sql --filename scripts/create_table.sql -x
