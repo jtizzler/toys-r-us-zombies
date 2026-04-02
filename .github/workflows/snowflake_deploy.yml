@@ -1,10 +1,47 @@
+# name: Snowflake Deploy
+# on:
+#   push:
+#     branches: [ main ]
+
+# permissions:
+#   id-token: write
+#   contents: read
+
+# jobs:
+#   deploy:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+
+#       - name: Set up Python
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: '3.11'
+
+#       - name: Install Snowflake CLI and Fix Compatibility
+#         run: |
+#           # Use the stable snowflake-cli package and fix the OpenSSL bug
+#           pip install snowflake-cli "pyOpenSSL>=22.1.0"
+
+#       - name: Run Deploy Script
+#         env:
+#           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+#           SNOWFLAKE_USER: GITHUB_SERVICE_USER
+#           SNOWFLAKE_AUTHENTICATOR: SNOWFLAKE_JWT
+#           SNOWFLAKE_JWT_TOKEN_FILE: ${{ github.token_path }}
+#         run: |
+#           # Test the connection first
+#           snow sql -q "SELECT CURRENT_VERSION()" -x
+#           # Deploy your actual table
+#           snow sql --file scripts/create_table.sql -x
 name: Snowflake Deploy
 on:
   push:
     branches: [ main ]
 
 permissions:
-  id-token: write
+  id-token: write      # Required to request the OIDC token
   contents: read
 
 jobs:
@@ -14,24 +51,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Setup Snowflake CLI
+        uses: snowflakedb/snowflake-cli-action@v2.0
         with:
-          python-version: '3.11'
-
-      - name: Install Snowflake CLI and Fix Compatibility
-        run: |
-          # Use the stable snowflake-cli package and fix the OpenSSL bug
-          pip install snowflake-cli "pyOpenSSL>=22.1.0"
+          cli-version: "latest"
+          use-oidc: true     # Automatically maps the GitHub token to the CLI
 
       - name: Run Deploy Script
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: GITHUB_SERVICE_USER
-          SNOWFLAKE_AUTHENTICATOR: SNOWFLAKE_JWT
-          SNOWFLAKE_JWT_TOKEN_FILE: ${{ github.token_path }}
         run: |
-          # Test the connection first
-          snow sql -q "SELECT CURRENT_VERSION()" -x
-          # Deploy your actual table
+          # Test the connection
+          snow connection test -x
+          # Deploy your table
           snow sql --file scripts/create_table.sql -x
