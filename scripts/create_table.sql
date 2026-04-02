@@ -12,4 +12,4 @@ CREATE TABLE IF NOT EXISTS sample_toy_inventory (
 );
 
 INSERT INTO sample_toy_inventory (id, toy_name, status) 
-VALUES (1, 'Zombie Action Figure', 'In Stock');
+VALUES (2, 'Power Puff Girl Action Figure', 'Out of Stock');
