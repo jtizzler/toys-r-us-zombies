@@ -43,4 +43,3 @@ jobs:
 
           # Deploy your actual table
           snow sql --filename scripts/create_table.sql -x
-          
