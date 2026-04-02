@@ -31,6 +31,6 @@ jobs:
           SNOWFLAKE_AUTHENTICATOR: SNOWFLAKE_JWT
         run: |
           # Test the connection first
-          snow sql -q "SELECT CURRENT_VERSION()"
+          snow sql -q "SELECT CURRENT_VERSION()" -x
           # Deploy your actual table
-          snow sql --file scripts/create_table.sql
+          snow sql --file scripts/create_table.sql -x
