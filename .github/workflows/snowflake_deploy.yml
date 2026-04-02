@@ -1,5 +1,52 @@
+# name: Snowflake Deploy
+# on:
+#   push:
+#     branches: [ main ]
+
+# permissions:
+#   id-token: write
+#   contents: read
+
+# jobs:
+#   deploy:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+
+#       - name: Set up Python
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: '3.11'
+
+#       - name: Install Snowflake CLI and Fix Compatibility
+#         run: |
+#           pip install snowflake-cli "pyOpenSSL>=22.1.0"
+
+#       - name: Write private key to file
+#         run: |
+#           echo "$SNOWFLAKE_PRIVATE_KEY" > private_key.p8
+#         env:
+#           SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+
+#       - name: Run Deploy Script
+#         env:
+#           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+#           SNOWFLAKE_USER: GITHUB_SERVICE_USER
+#           SNOWFLAKE_AUTHENTICATOR: SNOWFLAKE_JWT
+#           SNOWFLAKE_PRIVATE_KEY_PATH: private_key.p8
+
+#         run: |
+#           # Test the connection first
+#           snow sql -q "SELECT CURRENT_VERSION()" -x
+
+#           # Deploy your actual table
+#           snow sql --filename scripts/create_table.sql -x
 name: Snowflake Deploy
 on:
+  pull_request:
+    branches: [ main ]
   push:
     branches: [ main ]
 
@@ -14,13 +61,15 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # IMPORTANT: needed for git diff
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install Snowflake CLI and Fix Compatibility
+      - name: Install Snowflake CLI
         run: |
           pip install snowflake-cli "pyOpenSSL>=22.1.0"
 
@@ -30,16 +79,35 @@ jobs:
         env:
           SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
 
-      - name: Run Deploy Script
+      - name: Determine changed SQL files
+        id: changes
+        run: |
+          git fetch origin main
+
+          # Detect changed SQL files between PR branch and main
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD | grep -E '\.sql$' || true)
+
+          echo "Changed SQL files:"
+          echo "$CHANGED_FILES"
+
+          # Export to GitHub Actions output
+          echo "files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+
+      - name: Run changed SQL scripts
+        if: steps.changes.outputs.files != ''
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: GITHUB_SERVICE_USER
           SNOWFLAKE_AUTHENTICATOR: SNOWFLAKE_JWT
           SNOWFLAKE_PRIVATE_KEY_PATH: private_key.p8
-
         run: |
-          # Test the connection first
-          snow sql -q "SELECT CURRENT_VERSION()" -x
+          echo "Running changed SQL files..."
 
-          # Deploy your actual table
-          snow sql --filename scripts/create_table.sql -x
+          for file in ${{ steps.changes.outputs.files }}; do
+            echo "Executing: $file"
+            snow sql --filename "$file" -x
+          done
+
+      - name: No SQL changes detected
+        if: steps.changes.outputs.files == ''
+        run: echo "No SQL files changed. Skipping deployment."
