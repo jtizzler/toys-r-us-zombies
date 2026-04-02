@@ -82,10 +82,7 @@ jobs:
       - name: Determine changed SQL files
         id: changes
         run: |
-          # Ensure the remote is configured
           git remote set-url origin https://github.com/${{ github.repository }}.git
-
-          # Fetch main explicitly
           git fetch origin main
 
           if [ "${{ github.event_name }}" = "pull_request" ]; then
@@ -99,7 +96,10 @@ jobs:
           echo "Changed SQL files:"
           echo "$CHANGED_FILES"
 
-          echo "files=$CHANGED_FILES" >> $GITHUB_OUTPUT
+          # Convert newline-separated list into space-separated list
+          SAFE_FILES=$(echo "$CHANGED_FILES" | tr '\n' ' ')
+
+          echo "files=$SAFE_FILES" >> $GITHUB_OUTPUT
 
       - name: Run changed SQL scripts
         if: steps.changes.outputs.files != ''
