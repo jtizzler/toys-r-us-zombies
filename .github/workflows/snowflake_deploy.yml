@@ -25,7 +25,6 @@ jobs:
           pip install snowflake-cli "pyOpenSSL>=22.1.0"
 
       - name: Run Deploy Script
-        run: echo "${#SNOWFLAKE_PRIVATE_KEY}"
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: GITHUB_SERVICE_USER
@@ -34,6 +33,8 @@ jobs:
           SNOWFLAKE_PRIVATE_KEY_PASSPHRASE: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_PASSPHRASE }}
 
         run: |
+          # check private key 
+          echo "${#SNOWFLAKE_PRIVATE_KEY}"
           # Test the connection first
           snow sql -q "SELECT CURRENT_VERSION()" -x
           # Deploy your actual table
