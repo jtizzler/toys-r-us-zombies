@@ -54,7 +54,7 @@ jobs:
       - name: Setup Snowflake CLI
         uses: snowflakedb/snowflake-cli-action@v2.0
         with:
-          cli-version: "latest"
+          cli-version: "3.1.0"
           use-oidc: true     # Automatically maps the GitHub token to the CLI
 
       - name: Run Deploy Script
