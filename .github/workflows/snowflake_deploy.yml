@@ -30,11 +30,8 @@ jobs:
           SNOWFLAKE_USER: GITHUB_SERVICE_USER
           SNOWFLAKE_AUTHENTICATOR: SNOWFLAKE_JWT
           SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
-          SNOWFLAKE_PRIVATE_KEY_PASSPHRASE: ${{ secrets.SNOWFLAKE_PRIVATE_KEY_PASSPHRASE }}
 
         run: |
-          # check private key 
-          echo "${#SNOWFLAKE_PRIVATE_KEY}"
           # Test the connection first
           snow sql -q "SELECT CURRENT_VERSION()" -x
           # Deploy your actual table
