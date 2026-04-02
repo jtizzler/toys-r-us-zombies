@@ -1,0 +1,27 @@
+name: Snowflake Deployment
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  id-token: write      # REQUIRED for OIDC
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Snowflake CLI
+        uses: snowflakedb/snowflake-cli-action@v2.0
+        with:
+          cli-version: "3.11.0" # Minimum for OIDC
+          use-oidc: true         # Enables passwordless auth
+
+      - name: Deploy Code
+        env:
+          SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: github_service_user
+        run: snow sql -f ./scripts/setup.sql -x # Runs SQL
