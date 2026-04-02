@@ -10,6 +10,7 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,18 +22,24 @@ jobs:
 
       - name: Install Snowflake CLI and Fix Compatibility
         run: |
-          # Use the stable snowflake-cli package and fix the OpenSSL bug
           pip install snowflake-cli "pyOpenSSL>=22.1.0"
+
+      - name: Write private key to file
+        run: |
+          echo "$SNOWFLAKE_PRIVATE_KEY" > private_key.p8
+        env:
+          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
 
       - name: Run Deploy Script
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: GITHUB_SERVICE_USER
           SNOWFLAKE_AUTHENTICATOR: SNOWFLAKE_JWT
-          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+          SNOWFLAKE_PRIVATE_KEY_PATH: private_key.p8
 
         run: |
           # Test the connection first
           snow sql -q "SELECT CURRENT_VERSION()" -x
+
           # Deploy your actual table
           snow sql --file scripts/create_table.sql -x
