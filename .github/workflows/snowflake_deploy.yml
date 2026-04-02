@@ -25,6 +25,7 @@ jobs:
           pip install snowflake-cli "pyOpenSSL>=22.1.0"
 
       - name: Run Deploy Script
+        run: echo "${#SNOWFLAKE_PRIVATE_KEY}"
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: GITHUB_SERVICE_USER
