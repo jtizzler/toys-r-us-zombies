@@ -21,13 +21,16 @@ jobs:
 
       - name: Install Snowflake CLI and Fix Compatibility
         run: |
-          # This installs the CLI and the fix together in the same environment
-          pip install snowflake-cli-labs==3.1.0 "pyOpenSSL>=22.1.0"
+          # Use the stable snowflake-cli package and fix the OpenSSL bug
+          pip install snowflake-cli "pyOpenSSL>=22.1.0"
 
       - name: Run Deploy Script
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: GITHUB_SERVICE_USER
           SNOWFLAKE_AUTHENTICATOR: SNOWFLAKE_JWT
-        # run: snow sql -f scripts/create_table.sql
-        run: cat scripts/create_table.sql | snow sql
+        run: |
+          # Test the connection first
+          snow sql -q "SELECT CURRENT_VERSION()"
+          # Deploy your actual table
+          snow sql --file scripts/create_table.sql
