@@ -29,4 +29,4 @@ jobs:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
           SNOWFLAKE_USER: GITHUB_SERVICE_USER
           SNOWFLAKE_AUTHENTICATOR: SNOWFLAKE_JWT
-        run: snow sql --file scripts/create_table.sql
+        run: snow sql -f scripts/create_table.sql
