@@ -82,15 +82,23 @@ jobs:
       - name: Determine changed SQL files
         id: changes
         run: |
+          # Ensure the remote is configured
+          git remote set-url origin https://github.com/${{ github.repository }}.git
+
+          # Fetch main explicitly
           git fetch origin main
 
-          # Detect changed SQL files between PR branch and main
-          CHANGED_FILES=$(git diff --name-only origin/main...HEAD | grep -E '\.sql$' || true)
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "Detecting changes in PR..."
+            CHANGED_FILES=$(git diff --name-only origin/main...HEAD | grep -E '\.sql$' || true)
+          else
+            echo "Detecting changes on push to main..."
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '\.sql$' || true)
+          fi
 
           echo "Changed SQL files:"
           echo "$CHANGED_FILES"
 
-          # Export to GitHub Actions output
           echo "files=$CHANGED_FILES" >> $GITHUB_OUTPUT
 
       - name: Run changed SQL scripts
