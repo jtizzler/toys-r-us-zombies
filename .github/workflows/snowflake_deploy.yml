@@ -15,29 +15,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # IMPORTANT: needed for git diff
+          fetch-depth: 0 # Important for git diff
 
       - name: Set deployment environment
         id: env
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            TARGET_BRANCH="${{ github.event.pull_request.base.ref }}"
-          else
-            TARGET_BRANCH="${{ github.ref_name }}"
-          fi
-
+          TARGET_BRANCH="${{ github.ref_name }}"
           echo "Target branch: $TARGET_BRANCH"
 
           if [ "$TARGET_BRANCH" = "qa" ]; then
             echo "ENV=qa" >> $GITHUB_ENV
             echo "SNOWFLAKE_ROLE=GITHUB_CICD_ROLE_QA" >> $GITHUB_ENV
             echo "SNOWFLAKE_USER=GITHUB_SERVICE_USER_QA" >> $GITHUB_ENV
+            echo "SNOWFLAKE_PRIVATE_KEY_SECRET=SNOWFLAKE_PRIVATE_KEY_QA" >> $GITHUB_ENV
             echo "SNOWFLAKE_DATABASE=RAW_QA" >> $GITHUB_ENV
             echo "SNOWFLAKE_WAREHOUSE=COMPUTE_WH" >> $GITHUB_ENV
           elif [ "$TARGET_BRANCH" = "main" ]; then
             echo "ENV=prod" >> $GITHUB_ENV
             echo "SNOWFLAKE_ROLE=GITHUB_CICD_ROLE" >> $GITHUB_ENV
             echo "SNOWFLAKE_USER=GITHUB_SERVICE_USER" >> $GITHUB_ENV
+            echo "SNOWFLAKE_PRIVATE_KEY_SECRET=SNOWFLAKE_PRIVATE_KEY" >> $GITHUB_ENV
             echo "SNOWFLAKE_DATABASE=RAW_PROD" >> $GITHUB_ENV
             echo "SNOWFLAKE_WAREHOUSE=COMPUTE_WH" >> $GITHUB_ENV
           else
@@ -62,6 +59,7 @@ jobs:
           echo "Using Snowflake role: $SNOWFLAKE_ROLE"
           echo "Using database: $SNOWFLAKE_DATABASE"
           echo "Using warehouse: $SNOWFLAKE_WAREHOUSE"
+          echo "Using private key secret: $SNOWFLAKE_PRIVATE_KEY_SECRET"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -74,9 +72,15 @@ jobs:
 
       - name: Write private key to file
         run: |
-          echo "$SNOWFLAKE_PRIVATE_KEY" > private_key.p8
-        env:
-          SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
+          if [ "$ENV" = "qa" ]; then
+            echo "${{ secrets.SNOWFLAKE_PRIVATE_KEY_QA }}" > private_key.p8
+          elif [ "$ENV" = "main" ]; then
+            echo "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" > private_key.p8
+          else
+            echo "${{ secrets.SNOWFLAKE_PRIVATE_KEY_DEV }}" > private_key.p8
+          fi
+        shell: bash
+
 
       - name: Determine changed SQL files
         id: changes
