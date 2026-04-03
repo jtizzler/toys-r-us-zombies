@@ -4,6 +4,7 @@
 -- USE DATABASE raw_prod;
 USE SCHEMA test;
 
+
 CREATE TABLE IF NOT EXISTS loans (
     id INT,
     product STRING,
