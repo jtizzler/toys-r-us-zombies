@@ -1,54 +1,9 @@
-# name: Snowflake Deploy
-# on:
-#   push:
-#     branches: [ main ]
-
-# permissions:
-#   id-token: write
-#   contents: read
-
-# jobs:
-#   deploy:
-#     runs-on: ubuntu-latest
-
-#     steps:
-#       - name: Checkout repository
-#         uses: actions/checkout@v4
-
-#       - name: Set up Python
-#         uses: actions/setup-python@v5
-#         with:
-#           python-version: '3.11'
-
-#       - name: Install Snowflake CLI and Fix Compatibility
-#         run: |
-#           pip install snowflake-cli "pyOpenSSL>=22.1.0"
-
-#       - name: Write private key to file
-#         run: |
-#           echo "$SNOWFLAKE_PRIVATE_KEY" > private_key.p8
-#         env:
-#           SNOWFLAKE_PRIVATE_KEY: ${{ secrets.SNOWFLAKE_PRIVATE_KEY }}
-
-#       - name: Run Deploy Script
-#         env:
-#           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-#           SNOWFLAKE_USER: GITHUB_SERVICE_USER
-#           SNOWFLAKE_AUTHENTICATOR: SNOWFLAKE_JWT
-#           SNOWFLAKE_PRIVATE_KEY_PATH: private_key.p8
-
-#         run: |
-#           # Test the connection first
-#           snow sql -q "SELECT CURRENT_VERSION()" -x
-
-#           # Deploy your actual table
-#           snow sql --filename scripts/create_table.sql -x
 name: Snowflake Deploy
 on:
   pull_request:
-    branches: [ main ]
+    branches: [ main, qa ]
   push:
-    branches: [ main ]
+    branches: [ main, qa ]
 
 permissions:
   id-token: write
@@ -62,7 +17,29 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # IMPORTANT: needed for git diff
+          fetch-depth: 0 # IMPORTANT: needed for git diff
+
+      - name: Set deployment environment
+        id: env
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            TARGET_BRANCH="${{ github.event.pull_request.base.ref }}"
+          else
+            TARGET_BRANCH="${{ github.ref_name }}"
+          fi
+
+          echo "Target branch: $TARGET_BRANCH"
+
+          if [ "$TARGET_BRANCH" = "qa" ]; then
+            echo "ENV=qa" >> $GITHUB_ENV
+            echo "SNOWFLAKE_ROLE=GITHUB_SERVICE_ROLE_QA" >> $GITHUB_ENV
+          elif [ "$TARGET_BRANCH" = "main" ]; then
+            echo "ENV=prod" >> $GITHUB_ENV
+            echo "SNOWFLAKE_ROLE=GITHUB_SERVICE_ROLE_PROD" >> $GITHUB_ENV
+          else
+            echo "ENV=dev" >> $GITHUB_ENV
+            echo "SNOWFLAKE_ROLE=GITHUB_SERVICE_ROLE_DEV" >> $GITHUB_ENV
+          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -83,22 +60,20 @@ jobs:
         id: changes
         run: |
           git remote set-url origin https://github.com/${{ github.repository }}.git
-          git fetch origin main
 
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "Detecting changes in PR..."
-            CHANGED_FILES=$(git diff --name-only origin/main...HEAD | grep -E '\.sql$' || true)
+            git fetch origin ${{ github.event.pull_request.base.ref }}
+            CHANGED_FILES=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD | grep -E '\.sql$' || true)
           else
-            echo "Detecting changes on push to main..."
+            echo "Detecting changes on push..."
             CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '\.sql$' || true)
           fi
 
           echo "Changed SQL files:"
           echo "$CHANGED_FILES"
 
-          # Convert newline-separated list into space-separated list
           SAFE_FILES=$(echo "$CHANGED_FILES" | tr '\n' ' ')
-
           echo "files=$SAFE_FILES" >> $GITHUB_OUTPUT
 
       - name: Run changed SQL scripts
@@ -108,8 +83,10 @@ jobs:
           SNOWFLAKE_USER: GITHUB_SERVICE_USER
           SNOWFLAKE_AUTHENTICATOR: SNOWFLAKE_JWT
           SNOWFLAKE_PRIVATE_KEY_PATH: private_key.p8
+          SNOWFLAKE_ROLE: ${{ env.SNOWFLAKE_ROLE }}
         run: |
-          echo "Running changed SQL files..."
+          echo "Running changed SQL files in environment: $ENV"
+          echo "Using role: $SNOWFLAKE_ROLE"
 
           for file in ${{ steps.changes.outputs.files }}; do
             echo "Executing: $file"
