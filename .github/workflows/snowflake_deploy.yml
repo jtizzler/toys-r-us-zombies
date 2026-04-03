@@ -30,13 +30,13 @@ jobs:
 
           if [ "$TARGET_BRANCH" = "qa" ]; then
             echo "ENV=qa" >> $GITHUB_ENV
-            echo "SNOWFLAKE_ROLE=GITHUB_SERVICE_ROLE_QA" >> $GITHUB_ENV
+            echo "SNOWFLAKE_ROLE=GITHUB_CICD_ROLE_QA" >> $GITHUB_ENV
             echo "SNOWFLAKE_USER=GITHUB_SERVICE_USER_QA" >> $GITHUB_ENV
             echo "SNOWFLAKE_DATABASE=RAW_QA" >> $GITHUB_ENV
             echo "SNOWFLAKE_WAREHOUSE=COMPUTE_WH" >> $GITHUB_ENV
           elif [ "$TARGET_BRANCH" = "main" ]; then
             echo "ENV=prod" >> $GITHUB_ENV
-            echo "SNOWFLAKE_ROLE=GITHUB_SERVICE_ROLE" >> $GITHUB_ENV
+            echo "SNOWFLAKE_ROLE=GITHUB_CICD_ROLE" >> $GITHUB_ENV
             echo "SNOWFLAKE_USER=GITHUB_SERVICE_USER" >> $GITHUB_ENV
             echo "SNOWFLAKE_DATABASE=RAW_PROD" >> $GITHUB_ENV
             echo "SNOWFLAKE_WAREHOUSE=COMPUTE_WH" >> $GITHUB_ENV
