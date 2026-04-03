@@ -1,7 +1,5 @@
 name: Snowflake Deploy
 on:
-  pull_request:
-    branches: [ main, qa ]
   push:
     branches: [ main, qa ]
 
