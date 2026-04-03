@@ -4,7 +4,6 @@
 -- USE DATABASE raw_prod;
 USE SCHEMA test;
 
-
 CREATE TABLE IF NOT EXISTS sample_toy_inventory (
     id INT,
     toy_name STRING,
