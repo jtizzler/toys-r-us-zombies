@@ -33,9 +33,15 @@ jobs:
           if [ "$TARGET_BRANCH" = "qa" ]; then
             echo "ENV=qa" >> $GITHUB_ENV
             echo "SNOWFLAKE_ROLE=GITHUB_SERVICE_ROLE_QA" >> $GITHUB_ENV
+            echo "SNOWFLAKE_USER=GITHUB_SERVICE_USER_QA" >> $GITHUB_ENV
+            echo "SNOWFLAKE_DATABASE=RAW_QA" >> $GITHUB_ENV
+            echo "SNOWFLAKE_WAREHOUSE=COMPUTE_WH" >> $GITHUB_ENV
           elif [ "$TARGET_BRANCH" = "main" ]; then
             echo "ENV=prod" >> $GITHUB_ENV
-            echo "SNOWFLAKE_ROLE=GITHUB_SERVICE_ROLE_PROD" >> $GITHUB_ENV
+            echo "SNOWFLAKE_ROLE=GITHUB_SERVICE_ROLE" >> $GITHUB_ENV
+            echo "SNOWFLAKE_USER=GITHUB_SERVICE_USER" >> $GITHUB_ENV
+            echo "SNOWFLAKE_DATABASE=RAW_PROD" >> $GITHUB_ENV
+            echo "SNOWFLAKE_WAREHOUSE=COMPUTE_WH" >> $GITHUB_ENV
           else
             echo "ENV=dev" >> $GITHUB_ENV
             echo "SNOWFLAKE_ROLE=GITHUB_SERVICE_ROLE_DEV" >> $GITHUB_ENV
@@ -80,17 +86,24 @@ jobs:
         if: steps.changes.outputs.files != ''
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
-          SNOWFLAKE_USER: GITHUB_SERVICE_USER
           SNOWFLAKE_AUTHENTICATOR: SNOWFLAKE_JWT
           SNOWFLAKE_PRIVATE_KEY_PATH: private_key.p8
           SNOWFLAKE_ROLE: ${{ env.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_DATABASE: ${{ env.SNOWFLAKE_DATABASE }}
+          SNOWFLAKE_WAREHOUSE: ${{ env.SNOWFLAKE_WAREHOUSE }}
         run: |
           echo "Running changed SQL files in environment: $ENV"
           echo "Using role: $SNOWFLAKE_ROLE"
+          echo "Using database: $SNOWFLAKE_DATABASE"
+          echo "Using warehouse: $SNOWFLAKE_WAREHOUSE"
 
           for file in ${{ steps.changes.outputs.files }}; do
             echo "Executing: $file"
-            snow sql --filename "$file" -x
+            snow sql \
+              --filename "$file" \
+              -x \
+              -D database=$SNOWFLAKE_DATABASE \
+              -D warehouse=$SNOWFLAKE_WAREHOUSE
           done
 
       - name: No SQL changes detected
