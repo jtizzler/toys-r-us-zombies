@@ -42,8 +42,26 @@ jobs:
             echo "SNOWFLAKE_WAREHOUSE=COMPUTE_WH" >> $GITHUB_ENV
           else
             echo "ENV=dev" >> $GITHUB_ENV
-            echo "SNOWFLAKE_ROLE=GITHUB_SERVICE_ROLE_DEV" >> $GITHUB_ENV
+            echo "SNOWFLAKE_ROLE=GITHUB_CICD_ROLE_DEV" >> $GITHUB_ENV
           fi
+
+      - name: Debug OIDC / GitHub Context
+        run: |
+          echo "---- DEBUG INFO ----"
+          echo "GITHUB_REF: $GITHUB_REF"
+          echo "GITHUB_HEAD_REF: $GITHUB_HEAD_REF"
+          echo "GITHUB_BASE_REF: $GITHUB_BASE_REF"
+          echo "GITHUB_EVENT_NAME: $GITHUB_EVENT_NAME"
+          echo "GITHUB_REPOSITORY: $GITHUB_REPOSITORY"
+          echo "--------------------"
+          echo "NOTE: Actual OIDC subject is derived from repo + ref above."
+
+      - name: Debug Snowflake context
+        run: |
+          echo "Using Snowflake user: $SNOWFLAKE_USER"
+          echo "Using Snowflake role: $SNOWFLAKE_ROLE"
+          echo "Using database: $SNOWFLAKE_DATABASE"
+          echo "Using warehouse: $SNOWFLAKE_WAREHOUSE"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -84,6 +102,7 @@ jobs:
         if: steps.changes.outputs.files != ''
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
+          SNOWFLAKE_USER: ${{ env.SNOWFLAKE_USER }}
           SNOWFLAKE_AUTHENTICATOR: SNOWFLAKE_JWT
           SNOWFLAKE_PRIVATE_KEY_PATH: private_key.p8
           SNOWFLAKE_ROLE: ${{ env.SNOWFLAKE_ROLE }}
