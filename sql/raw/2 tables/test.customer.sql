@@ -2,15 +2,14 @@
 -- USE ROLE github_cicd_role;
 -- USE WAREHOUSE COMPUTE_WH;
 -- USE DATABASE raw_prod;
-USE SCHEMA raw_qa.test;
+-- USE SCHEMA test;
 
-CREATE TABLE IF NOT EXISTS loans (
+CREATE TABLE IF NOT EXISTS customer (
     id INT,
-    product STRING,
+    toy_name STRING,
     status STRING,
-    balance INT,
     created_at TIMESTAMP_NTZ DEFAULT CURRENT_TIMESTAMP()
 );
 
-INSERT INTO loans (id, product, status, balance) 
-VALUES (1, 'Mortgage', 'Default', '500');
+INSERT INTO customer (id, toy_name, status) 
+VALUES (1, 'Zombie Action Figure', 'In Stock');
