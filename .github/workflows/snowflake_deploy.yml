@@ -102,10 +102,14 @@ jobs:
             echo "Resolved schema: $schema_upper"
 
             # Set context
-            snow sql -q "USE DATABASE $database; USE SCHEMA $schema_upper;" -x
+            # snow sql -q "USE DATABASE $database; USE SCHEMA $schema_upper;" -x
 
             # Execute SQL file
-            snow sql --filename "$file" -x
+            # snow sql --filename "$file" -x
+            
+            # Set context and Execute SQL file
+            snow sql -q "USE DATABASE $database; USE SCHEMA $schema_upper; $(cat "$file")" -x
+
           done
 
       - name: No SQL changes detected
