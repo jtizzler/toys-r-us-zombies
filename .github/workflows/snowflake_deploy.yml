@@ -28,12 +28,14 @@ jobs:
             echo "SNOWFLAKE_ROLE=GITHUB_CICD_ROLE_QA" >> $GITHUB_ENV
             echo "SNOWFLAKE_USER=GITHUB_SERVICE_USER_QA" >> $GITHUB_ENV
             echo "SNOWFLAKE_PRIVATE_KEY_SECRET=SNOWFLAKE_PRIVATE_KEY_QA" >> $GITHUB_ENV
+            echo "SNOWFLAKE_WAREHOUSE=COMPUTE_WH" >> $GITHUB_ENV
 
           elif [ "$TARGET_BRANCH" = "main" ]; then
             echo "ENV=PROD" >> $GITHUB_ENV
             echo "SNOWFLAKE_ROLE=GITHUB_CICD_ROLE" >> $GITHUB_ENV
             echo "SNOWFLAKE_USER=GITHUB_SERVICE_USER" >> $GITHUB_ENV
             echo "SNOWFLAKE_PRIVATE_KEY_SECRET=SNOWFLAKE_PRIVATE_KEY" >> $GITHUB_ENV
+            echo "SNOWFLAKE_WAREHOUSE=COMPUTE_WH" >> $GITHUB_ENV
           fi
 
       - name: Install Snowflake CLI
@@ -53,14 +55,12 @@ jobs:
         run: |
           CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '^sql/.*\.sql$' || true)
 
-          # Sort by folder order
+          # Sort by folder order (1_schemas → 2_tables → etc.)
           ORDERED=$(echo "$CHANGED_FILES" | sort -t'/' -k3,3)
 
-          # Output newline-separated list
-          printf "%s\n" $ORDERED | sed '/^$/d' > changed_files.txt
-
+          # Output newline-separated list using GitHub Actions multiline syntax
           echo "files<<EOF" >> $GITHUB_OUTPUT
-          cat changed_files.txt >> $GITHUB_OUTPUT
+          echo "$ORDERED" | sed '/^$/d' >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Run changed SQL scripts
@@ -71,21 +71,19 @@ jobs:
           SNOWFLAKE_AUTHENTICATOR: SNOWFLAKE_JWT
           SNOWFLAKE_PRIVATE_KEY_PATH: private_key.p8
           SNOWFLAKE_ROLE: ${{ env.SNOWFLAKE_ROLE }}
+          SNOWFLAKE_WAREHOUSE: ${{ env.SNOWFLAKE_WAREHOUSE }}
         run: |
-          IFS=$'\n'
-          for file in $(printf "%s\n" "${{ steps.changes.outputs.files }}"); do
+          while IFS= read -r file; do
+            [ -z "$file" ] && continue
+
             echo "Executing: $file"
 
             # Extract database family (raw or analytics)
             db_family=$(echo "$file" | awk -F'/' '{print $2}')
 
-            # Extract filename
-            filename=$(basename "$file")
-
             # Extract schema from filename (test.loans.sql → test)
+            filename=$(basename "$file")
             schema=$(echo "$filename" | cut -d'.' -f1)
-
-            # Uppercase schema for Snowflake
             schema_upper=$(echo "$schema" | tr '[:lower:]' '[:upper:]')
 
             # Resolve actual database name
@@ -101,16 +99,10 @@ jobs:
             echo "Resolved database: $database"
             echo "Resolved schema: $schema_upper"
 
-            # Set context
-            # snow sql -q "USE DATABASE $database; USE SCHEMA $schema_upper;" -x
+            # Run context + SQL file in the SAME session
+            snow sql -q "USE DATABASE $database; USE SCHEMA $schema_upper; USE WAREHOUSE $SNOWFLAKE_WAREHOUSE; $(cat "$file")" -x
 
-            # Execute SQL file
-            # snow sql --filename "$file" -x
-            
-            # Set context and Execute SQL file
-            snow sql -q "USE DATABASE $database; USE SCHEMA $schema_upper; $(cat "$file")" -x
-
-          done
+          done <<< "${{ steps.changes.outputs.files }}"
 
       - name: No SQL changes detected
         if: steps.changes.outputs.files == ''
