@@ -15,7 +15,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # Important for git diff
+          fetch-depth: 0
 
       - name: Set deployment environment
         id: env
@@ -24,47 +24,16 @@ jobs:
           echo "Target branch: $TARGET_BRANCH"
 
           if [ "$TARGET_BRANCH" = "qa" ]; then
-            echo "ENV=qa" >> $GITHUB_ENV
+            echo "ENV=QA" >> $GITHUB_ENV
             echo "SNOWFLAKE_ROLE=GITHUB_CICD_ROLE_QA" >> $GITHUB_ENV
             echo "SNOWFLAKE_USER=GITHUB_SERVICE_USER_QA" >> $GITHUB_ENV
             echo "SNOWFLAKE_PRIVATE_KEY_SECRET=SNOWFLAKE_PRIVATE_KEY_QA" >> $GITHUB_ENV
-            echo "SNOWFLAKE_DATABASE=RAW_QA" >> $GITHUB_ENV
-            echo "SNOWFLAKE_WAREHOUSE=COMPUTE_WH" >> $GITHUB_ENV
           elif [ "$TARGET_BRANCH" = "main" ]; then
-            echo "ENV=prod" >> $GITHUB_ENV
+            echo "ENV=PROD" >> $GITHUB_ENV
             echo "SNOWFLAKE_ROLE=GITHUB_CICD_ROLE" >> $GITHUB_ENV
             echo "SNOWFLAKE_USER=GITHUB_SERVICE_USER" >> $GITHUB_ENV
             echo "SNOWFLAKE_PRIVATE_KEY_SECRET=SNOWFLAKE_PRIVATE_KEY" >> $GITHUB_ENV
-            echo "SNOWFLAKE_DATABASE=RAW_PROD" >> $GITHUB_ENV
-            echo "SNOWFLAKE_WAREHOUSE=COMPUTE_WH" >> $GITHUB_ENV
-          else
-            echo "ENV=dev" >> $GITHUB_ENV
-            echo "SNOWFLAKE_ROLE=GITHUB_CICD_ROLE_DEV" >> $GITHUB_ENV
           fi
-
-      - name: Debug OIDC / GitHub Context
-        run: |
-          echo "---- DEBUG INFO ----"
-          echo "GITHUB_REF: $GITHUB_REF"
-          echo "GITHUB_HEAD_REF: $GITHUB_HEAD_REF"
-          echo "GITHUB_BASE_REF: $GITHUB_BASE_REF"
-          echo "GITHUB_EVENT_NAME: $GITHUB_EVENT_NAME"
-          echo "GITHUB_REPOSITORY: $GITHUB_REPOSITORY"
-          echo "--------------------"
-          echo "NOTE: Actual OIDC subject is derived from repo + ref above."
-
-      - name: Debug Snowflake context
-        run: |
-          echo "Using Snowflake user: $SNOWFLAKE_USER"
-          echo "Using Snowflake role: $SNOWFLAKE_ROLE"
-          echo "Using database: $SNOWFLAKE_DATABASE"
-          echo "Using warehouse: $SNOWFLAKE_WAREHOUSE"
-          echo "Using private key secret: $SNOWFLAKE_PRIVATE_KEY_SECRET"
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
 
       - name: Install Snowflake CLI
         run: |
@@ -72,35 +41,17 @@ jobs:
 
       - name: Write private key to file
         run: |
-          if [ "$ENV" = "qa" ]; then
+          if [ "$ENV" = "QA" ]; then
             echo "${{ secrets.SNOWFLAKE_PRIVATE_KEY_QA }}" > private_key.p8
-          elif [ "$ENV" = "main" ]; then
-            echo "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" > private_key.p8
           else
-            echo "${{ secrets.SNOWFLAKE_PRIVATE_KEY_DEV }}" > private_key.p8
+            echo "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" > private_key.p8
           fi
-        shell: bash
-
 
       - name: Determine changed SQL files
         id: changes
         run: |
-          git remote set-url origin https://github.com/${{ github.repository }}.git
-
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "Detecting changes in PR..."
-            git fetch origin ${{ github.event.pull_request.base.ref }}
-            CHANGED_FILES=$(git diff --name-only origin/${{ github.event.pull_request.base.ref }}...HEAD | grep -E '\.sql$' || true)
-          else
-            echo "Detecting changes on push..."
-            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '\.sql$' || true)
-          fi
-
-          echo "Changed SQL files:"
-          echo "$CHANGED_FILES"
-
-          SAFE_FILES=$(echo "$CHANGED_FILES" | tr '\n' ' ')
-          echo "files=$SAFE_FILES" >> $GITHUB_OUTPUT
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '^sql/.*\.sql$' || true)
+          echo "files=$(echo "$CHANGED_FILES" | tr '\n' ' ')" >> $GITHUB_OUTPUT
 
       - name: Run changed SQL scripts
         if: steps.changes.outputs.files != ''
@@ -110,21 +61,46 @@ jobs:
           SNOWFLAKE_AUTHENTICATOR: SNOWFLAKE_JWT
           SNOWFLAKE_PRIVATE_KEY_PATH: private_key.p8
           SNOWFLAKE_ROLE: ${{ env.SNOWFLAKE_ROLE }}
-          SNOWFLAKE_DATABASE: ${{ env.SNOWFLAKE_DATABASE }}
-          SNOWFLAKE_WAREHOUSE: ${{ env.SNOWFLAKE_WAREHOUSE }}
         run: |
-          echo "Running changed SQL files in environment: $ENV"
-          echo "Using role: $SNOWFLAKE_ROLE"
-          echo "Using database: $SNOWFLAKE_DATABASE"
-          echo "Using warehouse: $SNOWFLAKE_WAREHOUSE"
-
           for file in ${{ steps.changes.outputs.files }}; do
             echo "Executing: $file"
-            snow sql \
-              --filename "$file" \
-              -x \
-              -D database=$SNOWFLAKE_DATABASE \
-              -D warehouse=$SNOWFLAKE_WAREHOUSE
+
+            # Extract database family (raw or analytics)
+            db_family=$(echo "$file" | awk -F'/' '{print $2}')
+
+            # Extract object folder (1 schemas, 2 tables, marts, reporting)
+            object_folder=$(echo "$file" | awk -F'/' '{print $3}')
+
+            # Extract filename
+            filename=$(basename "$file")
+
+            # Determine schema name
+            if [[ "$object_folder" == *"schemas"* ]]; then
+              # Example: test.sql
+              schema="${filename%.sql}"
+            else
+              # Example: test.loans.sql → schema = test
+              schema=$(echo "$filename" | cut -d'.' -f1)
+            fi
+
+            # Resolve actual database name
+            if [ "$db_family" = "raw" ]; then
+              database="RAW_${ENV}"
+            elif [ "$db_family" = "analytics" ]; then
+              database="ANALYTICS_${ENV}"
+            else
+              echo "Unknown database family: $db_family"
+              exit 1
+            fi
+
+            echo "Resolved database: $database"
+            echo "Resolved schema: $schema"
+
+            # Set context
+            snow sql -q "USE DATABASE $database; USE SCHEMA $schema;" -x
+
+            # Execute SQL file
+            snow sql --filename "$file" -x
           done
 
       - name: No SQL changes detected
