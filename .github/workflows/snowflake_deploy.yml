@@ -53,13 +53,15 @@ jobs:
         run: |
           CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '^sql/.*\.sql$' || true)
 
-          # Sort by folder order (1_schemas → 2_tables → etc.)
+          # Sort by folder order
           ORDERED=$(echo "$CHANGED_FILES" | sort -t'/' -k3,3)
 
-          # Trim whitespace so empty means empty
-          SAFE_FILES=$(echo "$ORDERED" | tr '\n' ' ' | xargs)
+          # Output newline-separated list
+          printf "%s\n" $ORDERED | sed '/^$/d' > changed_files.txt
 
-          echo "files=$SAFE_FILES" >> $GITHUB_OUTPUT
+          echo "files<<EOF" >> $GITHUB_OUTPUT
+          cat changed_files.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Run changed SQL scripts
         if: steps.changes.outputs.files != ''
