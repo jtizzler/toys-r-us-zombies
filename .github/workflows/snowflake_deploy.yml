@@ -50,10 +50,18 @@ jobs:
             echo "${{ secrets.SNOWFLAKE_PRIVATE_KEY }}" > private_key.p8
           fi
 
-      - name: Determine changed SQL files
+      - name: Determine SQL files to run
         id: changes
         run: |
-          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '^sql/.*\.sql$' || true)
+          TARGET_BRANCH="${{ github.ref_name }}"
+
+          if [ "$TARGET_BRANCH" = "qa" ]; then
+            echo "Mode: incremental (diff-based) for QA"
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E '^sql/.*\.sql$' || true)
+          else
+            echo "Mode: full deploy for main"
+            CHANGED_FILES=$(find sql -type f -name "*.sql" | sort || true)
+          fi
 
           # Sort by folder order (1_schemas → 2_tables → etc.)
           ORDERED=$(echo "$CHANGED_FILES" | sort -t'/' -k3,3)
@@ -63,7 +71,7 @@ jobs:
           echo "$ORDERED" | sed '/^$/d' >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Run changed SQL scripts
+      - name: Run SQL scripts
         if: steps.changes.outputs.files != ''
         env:
           SNOWFLAKE_ACCOUNT: ${{ secrets.SNOWFLAKE_ACCOUNT }}
@@ -81,7 +89,7 @@ jobs:
             # Extract database family (raw or analytics)
             db_family=$(echo "$file" | awk -F'/' '{print $2}')
 
-            # Extract schema from filename (test.loans.sql → test)
+            # Extract schema from filename (test.customer.sql → test)
             filename=$(basename "$file")
             schema=$(echo "$filename" | cut -d'.' -f1)
             schema_upper=$(echo "$schema" | tr '[:lower:]' '[:upper:]')
@@ -106,4 +114,4 @@ jobs:
 
       - name: No SQL changes detected
         if: steps.changes.outputs.files == ''
-        run: echo "No SQL files changed. Skipping deployment."
+        run: echo "No SQL files selected for this run. Skipping deployment."
