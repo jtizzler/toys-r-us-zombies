@@ -86,7 +86,7 @@ jobs:
 
             echo "Executing: $file"
 
-            # Extract database family (raw or analytics)
+            # Extract database family (staging or analytics)
             db_family=$(echo "$file" | awk -F'/' '{print $2}')
 
             # Extract schema from filename (test.customer.sql → test)
@@ -95,8 +95,8 @@ jobs:
             schema_upper=$(echo "$schema" | tr '[:lower:]' '[:upper:]')
 
             # Resolve actual database name
-            if [ "$db_family" = "raw" ]; then
-              database="RAW_${ENV}"
+            if [ "$db_family" = "staging" ]; then
+              database="STAGING_${ENV}"
             elif [ "$db_family" = "analytics" ]; then
               database="ANALYTICS_${ENV}"
             else
