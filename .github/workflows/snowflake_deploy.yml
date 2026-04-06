@@ -63,10 +63,8 @@ jobs:
             CHANGED_FILES=$(find sql -type f -name "*.sql" | sort || true)
           fi
 
-          # Sort by folder order (1_schemas → 2_tables → etc.)
           ORDERED=$(echo "$CHANGED_FILES" | sort -t'/' -k3,3)
 
-          # Output newline-separated list using GitHub Actions multiline syntax
           echo "files<<EOF" >> $GITHUB_OUTPUT
           echo "$ORDERED" | sed '/^$/d' >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
@@ -86,17 +84,14 @@ jobs:
 
             echo "Executing: $file"
 
-            # Extract database family (raw or analytics)
             db_family=$(echo "$file" | awk -F'/' '{print $2}')
 
-            # Extract schema from filename (test.customer.sql → test)
             filename=$(basename "$file")
             schema=$(echo "$filename" | cut -d'.' -f1)
             schema_upper=$(echo "$schema" | tr '[:lower:]' '[:upper:]')
 
-            # Resolve actual database name
-            if [ "$db_family" = "raw" ]; then
-              database="RAW_${ENV}"
+            if [ "$db_family" = "staging" ]; then
+              database="STAGING_${ENV}"
             elif [ "$db_family" = "analytics" ]; then
               database="ANALYTICS_${ENV}"
             else
@@ -107,8 +102,13 @@ jobs:
             echo "Resolved database: $database"
             echo "Resolved schema: $schema_upper"
 
-            # Run context + SQL file in the SAME session
-            snow sql -q "USE DATABASE $database; USE SCHEMA $schema_upper; USE WAREHOUSE $SNOWFLAKE_WAREHOUSE; $(cat "$file")" -x
+            # Detect schema creation files
+            if echo "$file" | grep -q "/1_schemas/"; then
+              echo "Schema creation file detected — skipping USE SCHEMA"
+              snow sql -q "USE DATABASE $database; USE WAREHOUSE $SNOWFLAKE_WAREHOUSE; $(cat "$file")" -x
+            else
+              snow sql -q "USE DATABASE $database; USE SCHEMA $schema_upper; USE WAREHOUSE $SNOWFLAKE_WAREHOUSE; $(cat "$file")" -x
+            fi
 
           done <<< "${{ steps.changes.outputs.files }}"
 
