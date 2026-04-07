@@ -1,0 +1,21 @@
+name: SQL Validation
+
+on:
+  pull_request:
+    branches: [ qa, main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install SQLFluff
+        run: |
+          pip install sqlfluff sqlfluff-templater-jinja
+
+      - name: Run SQLFluff Lint
+        run: |
+          sqlfluff lint sql/ --dialect snowflake
