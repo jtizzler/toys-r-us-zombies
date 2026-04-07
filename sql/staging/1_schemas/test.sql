@@ -1,1 +1,1 @@
-create schema if not exists test;
+CREATE SCHEMA IF NOT EXISTS TEST;
