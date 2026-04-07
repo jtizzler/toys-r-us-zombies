@@ -14,7 +14,7 @@ jobs:
 
       - name: Install SQLFluff
         run: |
-          pip install sqlfluff sqlfluff-templater-jinja
+          pip install sqlfluff
 
       - name: Run SQLFluff Lint
         run: |
